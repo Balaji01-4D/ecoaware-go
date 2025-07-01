@@ -101,3 +101,17 @@ func UpdateUser(c *gin.Context) {
 	
 	c.JSON(http.StatusOK, user)
 }
+
+func DeleteUser(c *gin.Context) {
+	idParam := c.Param("id")
+
+	if err := initializer.DB.Delete(&models.User{}, idParam).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error" : err.Error(),
+		})
+		return
+	}
+
+	c.Status(http.StatusOK)
+
+}
