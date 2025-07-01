@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Balaji01-4D/ecoware-go/dto"
 	"github.com/Balaji01-4D/ecoware-go/initializer"
 	"github.com/Balaji01-4D/ecoware-go/models"
 	"github.com/gin-gonic/gin"
@@ -11,22 +12,32 @@ import (
 
 func AddUser(c *gin.Context) {
 
-	var user models.User
-	
+	var user dto.UserRegisterDto
+
 	if err := c.BindJSON(&user); err != nil {
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
+	newUser := models.User{
+		Name: user.Name,
+		Email: user.Email,
+		Password: user.Password,
+		Role: user.Role,
+	}
 
-	result := initializer.DB.Create(&user)
+	result := initializer.DB.Create(&newUser)
 
 	if (result.Error != nil) {
 		c.Status(400)
 		return
 	}
+	userResponse := dto.UserResponseDto{
+		Name: newUser.Name,
+		Email: newUser.Email,
+	}
 	c.JSON(200, gin.H{
-		"user": user,
+		"user": userResponse,
 	})
 }
 
