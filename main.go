@@ -16,11 +16,12 @@ func main() {
 
 	router.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"message" : "this is home",
+			"message": "this is home",
 		})
 	})
 	router.GET("/users", controllers.GetUsers)
-	router.POST("/users", controllers.AddUser)
+	router.POST("/user/register", controllers.RegisterUser)
+	router.POST("/user/login", controllers.Login)
 	router.GET("/user/:id", controllers.GetUserById)
 	router.PUT("/user/:id", controllers.UpdateUser)
 	router.DELETE("/user/:id", controllers.DeleteUser)
