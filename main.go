@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/Balaji01-4D/ecoware-go/controllers"
 	"github.com/Balaji01-4D/ecoware-go/initializer"
+	"github.com/Balaji01-4D/ecoware-go/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -22,6 +23,7 @@ func main() {
 	router.GET("/users", controllers.GetUsers)
 	router.POST("/user/register", controllers.RegisterUser)
 	router.POST("/user/login", controllers.Login)
+	router.GET("/user/validate",middleware.RequireAuth,  controllers.Validate)
 	router.GET("/user/:id", controllers.GetUserById)
 	router.PUT("/user/:id", controllers.UpdateUser)
 	router.DELETE("/user/:id", controllers.DeleteUser)

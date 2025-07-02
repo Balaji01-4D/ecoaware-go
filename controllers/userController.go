@@ -1,10 +1,10 @@
 package controllers
 
 import (
-	"net/http"
 	"os"
-	"strconv"
 	"time"
+	"net/http"
+	"strconv"
 
 	"github.com/Balaji01-4D/ecoware-go/dto"
 	"github.com/Balaji01-4D/ecoware-go/initializer"
@@ -13,6 +13,14 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
+
+func Validate(c *gin.Context) {
+	user, _ := c.Get("user")
+	c.JSON(http.StatusOK, gin.H{
+		"message":"i am logged in",
+		"profile":user,
+	})
+}
 
 func RegisterUser(c *gin.Context) {
 
@@ -188,9 +196,10 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":tokenString,
-	})
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("Authorization", tokenString, 3600 * 24 * 30, "", "", false, true)
+
+	c.JSON(http.StatusOK, gin.H{})
 
 
 }
