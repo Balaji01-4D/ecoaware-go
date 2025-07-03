@@ -20,10 +20,19 @@ func main() {
 			"message": "this is home",
 		})
 	})
-	router.GET("/users", controllers.GetUsers)
 	router.POST("/user/register", controllers.RegisterUser)
 	router.POST("/user/login", controllers.Login)
-	router.GET("/user/validate",middleware.RequireAuth,  controllers.Validate)
+
+	
+	api := router.Group("/api")
+	api.Use(middleware.RequireAuth())
+
+	api.GET("/user/validate", controllers.Validate)
+	api.POST("/complaint", controllers.AddComplaints)
+	api.PUT("/complaint/:id", controllers.UpdateComplaints)
+
+
+	router.GET("/api/users", controllers.GetUsers)
 	router.GET("/user/:id", controllers.GetUserById)
 	router.PUT("/user/:id", controllers.UpdateUser)
 	router.DELETE("/user/:id", controllers.DeleteUser)
