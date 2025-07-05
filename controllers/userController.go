@@ -1,10 +1,10 @@
 package controllers
 
 import (
-	"os"
-	"time"
 	"net/http"
+	"os"
 	"strconv"
+	"time"
 
 	"github.com/Balaji01-4D/ecoware-go/dto"
 	"github.com/Balaji01-4D/ecoware-go/initializer"
@@ -101,52 +101,47 @@ func getById(id int) *models.User {
 	return &user
 }
 
-func UpdateUser(c *gin.Context) {
 
-	idParam := c.Param("id")
-	id, err := strconv.Atoi(idParam)
+func UpdateUserByUser(c *gin.Context) {
+	loginedUser := c.MustGet("user").(models.User)
 
-	if err != nil {
-		c.Status(http.StatusBadRequest)
-		return
-	}
-	var input models.User
-	if err := c.ShouldBindJSON(&input); err != nil {
-		c.Status(http.StatusBadRequest)
-		return
-	}
+	var userRecord models.User
 
-	var user models.User
-	if err := initializer.DB.First(&user, id).Error; err != nil {
-		c.Status(http.StatusNotFound)
-		return
-	}
-
-	user.Name = input.Name
-	user.Email = input.Email
-	user.Password = input.Password
-
-	if err := initializer.DB.Save(&user).Error; err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	c.JSON(http.StatusOK, user)
-}
-
-func DeleteUser(c *gin.Context) {
-	idParam := c.Param("id")
-
-	if err := initializer.DB.Delete(&models.User{}, idParam).Error; err != nil {
+	if err := initializer.DB.First(&userRecord, loginedUser.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
+			"message":"failed to get the user",
 		})
 		return
 	}
 
-	c.Status(http.StatusOK)
+	var body struct {
+		Name string 		`json:"name"`
+		Email string 		`json:"email"`
+	}
 
+	if c.BindJSON(&body) != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message" :"failed to read body",
+		})
+		return
+	}
+
+	if err := initializer.DB.Model(&loginedUser).
+	Update("name", body.Name).
+	Update("email", body.Email).
+	Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message":"failed to update",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":"successfully updated",
+	})
 }
+
+
 
 
 func Login(c *gin.Context) {
@@ -242,4 +237,48 @@ func Me(c *gin.Context) {
 	
 	}
 
+}
+
+func UpdatePassword(c *gin.Context) {
+	loginedUser := c.MustGet("user").(models.User)
+
+	var userRecord models.User
+
+	if err := initializer.DB.First(&userRecord, loginedUser.ID).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message":"failed to get the user",
+		})
+		return
+	}
+
+	var body struct {
+		CurrentPassword string `json:"currentPassword"`
+		NewPassword string 		`json:"newPassword"`
+	}
+
+	if c.BindJSON(&body) != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message" :"failed to read body",
+		})
+		return
+	}
+
+	if userRecord.Password != body.CurrentPassword {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message":"wrong password",
+		})
+		return
+	}
+
+	if err := initializer.DB.Model(&loginedUser).
+	Update("password", body.NewPassword).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message":"failed to update the password",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":"successfully updated the password",
+	})
 }
