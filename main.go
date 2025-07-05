@@ -35,7 +35,6 @@ func main() {
 	r.POST("/auth/register", controllers.RegisterUser)
 	r.POST("/auth/login", controllers.Login)
 	r.GET("/auth/me", controllers.Me)
-
 	r.GET("/categories", controllers.GetAllCategories)
 
 	protected := r.Group("/")
@@ -44,11 +43,16 @@ func main() {
 	protected.GET("/complaints", controllers.GetMyComplaints)
 	protected.POST("/complaints", controllers.AddComplaints)
 	protected.GET("/complaints/:id", controllers.GetComplaintByID)
+	protected.PUT("/user/password", controllers.UpdatePassword)
+	protected.PUT("/user/profile", controllers.UpdateUserByUser)
+
 
 	admin := r.Group("/admin")
 	admin.Use(middleware.RequireAuth(), middleware.RequireAdmin())
 
 	admin.GET("/users", controllers.GetAllUsers)
+	admin.DELETE("/users/:id", controllers.DeleteUser)
+	admin.PUT("/users/:id", controllers.UpdateUser)
 	admin.GET("/complaints", controllers.GetAllComplaints)
 	admin.PUT("/complaints/:id/status", controllers.UpdateComplaintStatus)
 
