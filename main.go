@@ -1,9 +1,12 @@
 package main
 
 import (
+	"time"
+
 	"github.com/Balaji01-4D/ecoware-go/controllers"
 	"github.com/Balaji01-4D/ecoware-go/initializer"
 	"github.com/Balaji01-4D/ecoware-go/middleware"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,28 +16,42 @@ func init() {
 }
 
 func main() {
-	router := gin.Default()
+	r := gin.Default()
 
-	router.GET("/", func(c *gin.Context) {
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:8080", "http://127.0.0.1:8080"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
+	r.GET("/", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message": "this is home",
 		})
 	})
-	router.POST("/user/register", controllers.RegisterUser)
-	router.POST("/user/login", controllers.Login)
+	r.POST("/auth/register", controllers.RegisterUser)
+	r.POST("/auth/login", controllers.Login)
+	r.GET("/auth/me", controllers.Me)
 
-	
-	api := router.Group("/api")
-	api.Use(middleware.RequireAuth())
+	r.GET("/categories", controllers.GetAllCategories)
 
-	api.GET("/user/validate", controllers.Validate)
-	api.POST("/complaint", controllers.AddComplaints)
-	api.PUT("/complaint/:id", controllers.UpdateComplaints)
+	protected := r.Group("/")
+	protected.Use(middleware.RequireAuth())
+
+	protected.GET("/complaints", controllers.GetMyComplaints)
+	protected.POST("/complaints", controllers.AddComplaints)
+	protected.GET("/complaints/:id", controllers.GetComplaintByID)
+
+	admin := r.Group("/admin")
+	admin.Use(middleware.RequireAuth(), middleware.RequireAdmin())
+
+	admin.GET("/users", controllers.GetAllUsers)
+	admin.GET("/complaints", controllers.GetAllComplaints)
+	admin.PUT("/complaints/:id/status", controllers.UpdateComplaintStatus)
 
 
-	router.GET("/api/users", controllers.GetUsers)
-	router.GET("/user/:id", controllers.GetUserById)
-	router.PUT("/user/:id", controllers.UpdateUser)
-	router.DELETE("/user/:id", controllers.DeleteUser)
-	router.Run()
+	r.Run()
 }

@@ -197,9 +197,49 @@ func Login(c *gin.Context) {
 	}
 
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("Authorization", tokenString, 3600 * 24 * 30, "", "", false, true)
+	c.SetCookie("Authorization", tokenString, 3600*24*30, "/", "localhost", false, true)
 
 	c.JSON(http.StatusOK, gin.H{})
 
+
+}
+
+func Me(c *gin.Context) {
+
+	tokenString, err := c.Cookie("Authorization")
+
+	if err != nil {
+		c.AbortWithStatus(http.StatusUnauthorized)
+	}
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return []byte(os.Getenv("SECRET_KEY")), nil
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
+
+
+	if err != nil || !token.Valid {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid or expired token"})
+		return
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok  && token.Valid{
+		var user models.User
+
+		initializer.DB.First(&user, "email = ?", claims["sub"])
+
+		if user.ID == 0 {
+		c.AbortWithStatus(http.StatusUnauthorized)
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"id":    user.ID,
+			"name":  user.Name,
+			"email": user.Email,
+			"role":  user.Role,
+		})
+	}else {
+		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid token"})
+	
+	}
 
 }
