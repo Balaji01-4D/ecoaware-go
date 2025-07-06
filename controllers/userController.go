@@ -9,6 +9,7 @@ import (
 	"github.com/Balaji01-4D/ecoware-go/dto"
 	"github.com/Balaji01-4D/ecoware-go/initializer"
 	"github.com/Balaji01-4D/ecoware-go/models"
+	"github.com/Balaji01-4D/ecoware-go/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
@@ -142,8 +143,6 @@ func UpdateUserByUser(c *gin.Context) {
 }
 
 
-
-
 func Login(c *gin.Context) {
 
 	var body struct {
@@ -177,12 +176,8 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": user.Email,
-		"exp": time.Now().Add(time.Hour * 24 * 30).Unix(),
-	})
-
-	tokenString, err := token.SignedString([]byte(os.Getenv("SECRET_KEY")))
+	tokenString, err := utils.GenerateAccessToken(user.ID)
+	refresh_token := utils.GenerateRefreshToken()
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -191,12 +186,60 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	initializer.DB.Model(&models.RefreshSession{
+		UserId: user.ID,
+		Token: refresh_token,
+		ExpiresAt: time.Now().Add(7*24*time.Hour),
+	})
+
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("Authorization", tokenString, 3600*24*30, "/", "localhost", false, true)
+	c.SetCookie("Authorization", tokenString, 900, "/", "localhost", false, true)
+	c.SetCookie("refresh_token", refresh_token, 7*24*3600, "/", "localhost", false, true)
 
 	c.JSON(http.StatusOK, gin.H{})
 
+}
 
+func Refresh(c *gin.Context) {
+	refreshToken, err := c.Cookie("refresh_token")
+
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message":"missing refresh token",
+		})
+		return
+	}
+
+	var session models.RefreshSession
+	if err := initializer.DB.Where("token = ?", refreshToken).
+	First(&session).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message":"invalid refresh token",
+		})
+		return
+	}
+
+	if session.ExpiresAt.Before(time.Now()) {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message":"refresh token expired",
+		})
+		return
+	}
+
+	newRefreshToken := utils.GenerateRefreshToken()
+	session.Token = newRefreshToken
+	session.ExpiresAt = time.Now().Add(7*24*time.Hour)
+	initializer.DB.Save(&session)
+
+	newAccessToken, _ := utils.GenerateAccessToken(session.UserId)
+
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie("Authorization", newAccessToken, 900, "/", "localhost", false, true)
+	c.SetCookie("refresh_token", newRefreshToken, 7*24*3600, "/", "localhost", false, true)
+	
+	c.JSON(http.StatusOK, gin.H{
+		"message":"token refresh",
+	})
 }
 
 func Me(c *gin.Context) {
@@ -281,4 +324,19 @@ func UpdatePassword(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message":"successfully updated the password",
 	})
+}
+
+func Logout(c *gin.Context) {
+
+	refreshToken, _ := c.Cookie("refresh_token")
+
+	initializer.DB.Where("token = ?", refreshToken).Delete(&models.RefreshSession{})
+
+	c.SetCookie("Authorization", "", -1, "/", "localhost", false, true)
+	c.SetCookie("refresh_token", "", -1, "/", "localhost", false, true)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":"logged out",
+	})
+	
 }
