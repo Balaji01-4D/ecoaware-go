@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -18,8 +19,8 @@ import (
 func Validate(c *gin.Context) {
 	user, _ := c.Get("user")
 	c.JSON(http.StatusOK, gin.H{
-		"message":"i am logged in",
-		"profile":user,
+		"message": "i am logged in",
+		"profile": user,
 	})
 }
 
@@ -31,12 +32,12 @@ func RegisterUser(c *gin.Context) {
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message":"cannot hash the password",
+			"message": "cannot hash the password",
 		})
 		return
 	}
@@ -52,7 +53,7 @@ func RegisterUser(c *gin.Context) {
 
 	if result.Error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message":"fail to create the user",
+			"message": "fail to create the user",
 		})
 		return
 	}
@@ -102,7 +103,6 @@ func getById(id int) *models.User {
 	return &user
 }
 
-
 func UpdateUserByUser(c *gin.Context) {
 	loginedUser := c.MustGet("user").(models.User)
 
@@ -110,49 +110,48 @@ func UpdateUserByUser(c *gin.Context) {
 
 	if err := initializer.DB.First(&userRecord, loginedUser.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message":"failed to get the user",
+			"message": "failed to get the user",
 		})
 		return
 	}
 
 	var body struct {
-		Name string 		`json:"name"`
-		Email string 		`json:"email"`
+		Name  string `json:"name"`
+		Email string `json:"email"`
 	}
 
 	if c.BindJSON(&body) != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message" :"failed to read body",
+			"message": "failed to read body",
 		})
 		return
 	}
 
 	if err := initializer.DB.Model(&loginedUser).
-	Update("name", body.Name).
-	Update("email", body.Email).
-	Error; err != nil {
+		Update("name", body.Name).
+		Update("email", body.Email).
+		Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message":"failed to update",
+			"message": "failed to update",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":"successfully updated",
+		"message": "successfully updated",
 	})
 }
-
 
 func Login(c *gin.Context) {
 
 	var body struct {
-		Email string
+		Email    string
 		Password string
 	}
 
 	if c.BindJSON(&body) != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message" :"failed to read body",
+			"message": "failed to read body",
 		})
 		return
 	}
@@ -161,17 +160,17 @@ func Login(c *gin.Context) {
 
 	if user.ID == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message":"invalid email or password or user not found",
+			"message": "invalid email or password or user not found",
 		})
 		return
-	
+
 	}
 
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(body.Password))
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message":"invalid email or password",
+			"message": "invalid email or password",
 		})
 		return
 	}
@@ -180,17 +179,21 @@ func Login(c *gin.Context) {
 	refresh_token := utils.GenerateRefreshToken()
 
 	if err != nil {
+		fmt.Println(err)
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message":"failed to create token",
+			"message": "failed to create token",
 		})
 		return
 	}
 
-	initializer.DB.Model(&models.RefreshSession{
-		UserId: user.ID,
-		Token: refresh_token,
-		ExpiresAt: time.Now().Add(7*24*time.Hour),
-	})
+	var userRefreshSession models.RefreshSession = models.RefreshSession{
+		UserID:    user.ID,
+		Token:     refresh_token,
+		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+	
+	}
+
+	initializer.DB.Save(&userRefreshSession)
 
 	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie("Authorization", tokenString, 900, "/", "localhost", false, true)
@@ -205,40 +208,40 @@ func Refresh(c *gin.Context) {
 
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"message":"missing refresh token",
+			"message": "missing refresh token",
 		})
 		return
 	}
 
 	var session models.RefreshSession
 	if err := initializer.DB.Where("token = ?", refreshToken).
-	First(&session).Error; err != nil {
+		First(&session).Error; err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"message":"invalid refresh token",
+			"message": "invalid refresh token",
 		})
 		return
 	}
 
 	if session.ExpiresAt.Before(time.Now()) {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"message":"refresh token expired",
+			"message": "refresh token expired",
 		})
 		return
 	}
 
 	newRefreshToken := utils.GenerateRefreshToken()
 	session.Token = newRefreshToken
-	session.ExpiresAt = time.Now().Add(7*24*time.Hour)
+	session.ExpiresAt = time.Now().Add(7 * 24 * time.Hour)
 	initializer.DB.Save(&session)
 
-	newAccessToken, _ := utils.GenerateAccessToken(session.UserId)
+	newAccessToken, _ := utils.GenerateAccessToken(session.UserID)
 
 	c.SetSameSite(http.SameSiteLaxMode)
 	c.SetCookie("Authorization", newAccessToken, 900, "/", "localhost", false, true)
 	c.SetCookie("refresh_token", newRefreshToken, 7*24*3600, "/", "localhost", false, true)
-	
+
 	c.JSON(http.StatusOK, gin.H{
-		"message":"token refresh",
+		"message": "token refreshed",
 	})
 }
 
@@ -254,19 +257,18 @@ func Me(c *gin.Context) {
 		return []byte(os.Getenv("SECRET_KEY")), nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 
-
 	if err != nil || !token.Valid {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid or expired token"})
 		return
 	}
 
-	if claims, ok := token.Claims.(jwt.MapClaims); ok  && token.Valid{
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		var user models.User
 
-		initializer.DB.First(&user, "email = ?", claims["sub"])
+		initializer.DB.Where("id = ?", claims["sub"]).First(&user)
 
 		if user.ID == 0 {
-		c.AbortWithStatus(http.StatusUnauthorized)
+			c.AbortWithStatus(http.StatusUnauthorized)
 		}
 
 		c.JSON(http.StatusOK, gin.H{
@@ -275,9 +277,9 @@ func Me(c *gin.Context) {
 			"email": user.Email,
 			"role":  user.Role,
 		})
-	}else {
+	} else {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "Invalid token"})
-	
+
 	}
 
 }
@@ -289,54 +291,64 @@ func UpdatePassword(c *gin.Context) {
 
 	if err := initializer.DB.First(&userRecord, loginedUser.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message":"failed to get the user",
+			"message": "failed to get the user",
 		})
 		return
 	}
 
 	var body struct {
 		CurrentPassword string `json:"currentPassword"`
-		NewPassword string 		`json:"newPassword"`
+		NewPassword     string `json:"newPassword"`
 	}
 
 	if c.BindJSON(&body) != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message" :"failed to read body",
+			"message": "failed to read body",
 		})
 		return
 	}
 
-	if userRecord.Password != body.CurrentPassword {
+
+	err := bcrypt.CompareHashAndPassword([]byte(userRecord.Password), []byte(body.CurrentPassword))
+
+	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"message":"wrong password",
+			"message": "wrong password",
 		})
 		return
 	}
 
 	if err := initializer.DB.Model(&loginedUser).
-	Update("password", body.NewPassword).Error; err != nil {
+		Update("password", body.NewPassword).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"message":"failed to update the password",
+			"message": "failed to update the password",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":"successfully updated the password",
+		"message": "successfully updated",
 	})
 }
 
 func Logout(c *gin.Context) {
 
 	refreshToken, _ := c.Cookie("refresh_token")
+	fmt.Println(refreshToken)
 
-	initializer.DB.Where("token = ?", refreshToken).Delete(&models.RefreshSession{})
+	if err := initializer.DB.Where("token = ?", refreshToken).
+	Delete(&models.RefreshSession{}).Error; err != nil{
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"message":"cannot delete the token",
+		})
+		return 
+	}
 
 	c.SetCookie("Authorization", "", -1, "/", "localhost", false, true)
 	c.SetCookie("refresh_token", "", -1, "/", "localhost", false, true)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":"logged out",
+		"message": "logged out",
 	})
-	
+
 }
