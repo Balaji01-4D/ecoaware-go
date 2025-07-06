@@ -38,7 +38,7 @@ func requireAuth(c *gin.Context) {
 
 		var user models.User
 
-		initializer.DB.First(&user, "email = ?", claims["sub"])
+		initializer.DB.Where("id = ?", claims["sub"]).First(&user)
 
 
 		if user.ID == 0 {
