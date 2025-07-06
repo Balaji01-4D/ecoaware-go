@@ -12,6 +12,7 @@ func init() {
 
 func main() {
 	initializer.DB.AutoMigrate(&models.User{})
-	initializer.DB.AutoMigrate(&models.Complaint{})
+	initializer.DB.AutoMigrate(&models.RefreshSession{})
 	initializer.DB.AutoMigrate(&models.Category{})
+	initializer.DB.AutoMigrate(&models.Complaint{})
 }
