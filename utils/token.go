@@ -10,12 +10,13 @@ import (
 
 
 func GenerateAccessToken(userID uint) (string, error){
-	claims := jwt.MapClaims{
-		"user_id":userID,
-		"exp":time.Now().Add(15 * time.Minute).Unix(),
-	}
-	 token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
-	 return token.SignedString([]byte(os.Getenv("SECRET")))
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	"sub": userID,
+	"exp": time.Now().Add(15 * time.Minute).Unix(),
+	})
+
+	return token.SignedString([]byte(os.Getenv("SECRET_KEY")))
 }
 
 func GenerateRefreshToken() string {
